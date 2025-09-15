@@ -1,0 +1,23 @@
+[
+  {
+    "id": "case_small_startup",
+    "lead": {"company":"Acme AI","name":"Jordan Smith","title":"Head of Product","website":"https://acme.ai","company_metadata":"{\"company_size\":15,\"industry\":\"SaaS\",\"recent_funding\":\"seed\"}"},
+    "weights": {"company_size": 1, "industry_fit": 3, "funding":2},
+    "expected_score": 65,
+    "tol": 25
+  },
+  {
+    "id": "case_enterprise",
+    "lead": {"company":"MegaCorp Inc","name":"Taylor Lee","title":"VP Sales","website":"https://megacorp.com","company_metadata":"{\"company_size\":5000,\"industry\":\"Finance\",\"recent_funding\": null}"},
+    "weights": {"company_size": 3, "industry_fit": 2},
+    "expected_score": 80,
+    "tol": 20
+  },
+  {
+    "id": "case_medium_tech",
+    "lead": {"company":"TechFlow Solutions","name":"Alex Chen","title":"CTO","website":"https://techflow.com","company_metadata":"{\"company_size\":150,\"industry\":\"Technology\",\"recent_funding\":\"Series A\"}"},
+    "weights": {"company_size": 2, "industry_fit": 3, "funding": 2},
+    "expected_score": 75,
+    "tol": 20
+  }
+]

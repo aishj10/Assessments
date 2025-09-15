@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+SQLAlchemy
+psycopg2-binary
+pydantic
+python-dotenv
+requests
+alembic
+sqlmodel
+typing-extensions
+python-multipart
