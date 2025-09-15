@@ -1,6 +1,6 @@
 # backend/app/routers/leads.py
 from fastapi import APIRouter, Depends, HTTPException
-from sqlmodel import select
+from sqlmodel import select, Session
 from app.database import get_session
 from app.models import Lead, ActivityLog, PipelineStage
 from app.schemas import LeadCreate, LeadRead, LeadUpdate, QualificationRequest, StageProgressionRequest
@@ -9,31 +9,73 @@ from app.prompts import qualification_prompt, outreach_prompt
 from app.pipeline_service import PipelineService
 from app.search_service import SearchService
 import json
+import logging
+from typing import Optional
+
+# Set up logging
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/leads", tags=["leads"])
 
 @router.post("/", response_model=LeadRead)
-def create_lead(payload: LeadCreate, session=Depends(get_session)):
-    lead = Lead(
-        company=payload.company,
-        name=payload.name,
-        title=payload.title,
-        email=payload.email,
-        phone=payload.phone,
-        website=payload.website,
-        company_metadata=json.dumps(payload.company_metadata or {}),
-    )
-    session.add(lead)
-    session.commit()
-    session.refresh(lead)
-    
-    # Log the lead creation activity
-    PipelineService.log_activity(
-        session, lead.id, "system", "lead_created", 
-        f"Lead created for {lead.company} - {lead.name or 'No contact name'}"
-    )
-    
-    return lead
+def create_lead(payload: LeadCreate, session: Session = Depends(get_session)):
+    """Create a new lead with proper error handling"""
+    try:
+        # Validate required fields
+        if not payload.company or not payload.company.strip():
+            raise HTTPException(status_code=400, detail="Company name is required")
+        
+        # Check for duplicate company names
+        existing_lead = session.exec(
+            select(Lead).where(Lead.company.ilike(payload.company.strip()))
+        ).first()
+        
+        if existing_lead:
+            raise HTTPException(
+                status_code=409, 
+                detail=f"Lead with company '{payload.company}' already exists"
+            )
+        
+        # Create lead with proper metadata handling
+        try:
+            metadata_json = json.dumps(payload.company_metadata or {})
+        except (TypeError, ValueError) as e:
+            logger.error(f"Invalid company metadata: {e}")
+            raise HTTPException(status_code=400, detail="Invalid company metadata format")
+        
+        lead = Lead(
+            company=payload.company.strip(),
+            name=payload.name.strip() if payload.name else None,
+            title=payload.title.strip() if payload.title else None,
+            email=payload.email.strip() if payload.email else None,
+            phone=payload.phone.strip() if payload.phone else None,
+            website=payload.website.strip() if payload.website else None,
+            company_metadata=metadata_json,
+        )
+        
+        session.add(lead)
+        session.commit()
+        session.refresh(lead)
+        
+        # Log the lead creation activity
+        try:
+            PipelineService.log_activity(
+                session, lead.id, "system", "lead_created", 
+                f"Lead created for {lead.company} - {lead.name or 'No contact name'}"
+            )
+        except Exception as e:
+            logger.error(f"Failed to log lead creation activity: {e}")
+            # Don't fail the request if logging fails
+        
+        logger.info(f"Successfully created lead {lead.id} for company {lead.company}")
+        return lead
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error creating lead: {e}")
+        session.rollback()
+        raise HTTPException(status_code=500, detail="Internal server error creating lead")
 
 @router.get("/", response_model=list[LeadRead])
 def list_leads(session=Depends(get_session)):
@@ -83,62 +125,135 @@ def delete_lead(lead_id: int, session=Depends(get_session)):
     return {"message": f"Lead {lead_id} deleted successfully"}
 
 @router.post("/qualify", summary="Run Grok qualification")
-def qualify(req: QualificationRequest, session=Depends(get_session)):
-    lead = session.get(Lead, req.lead_id)
-    if not lead:
-        raise HTTPException(status_code=404, detail="lead not found")
-
-    lead_data = {
-        "company": lead.company,
-        "name": lead.name,
-        "title": lead.title,
-        "email": lead.email,
-        "website": lead.website,
-        "company_metadata": lead.company_metadata
-    }
-
-    prompt = qualification_prompt(lead_data, req.scoring_weights)
+def qualify(req: QualificationRequest, session: Session = Depends(get_session)):
+    """Run AI qualification on a lead with comprehensive error handling"""
     try:
-        resp = call_grok(prompt)
-    except GrokError as e:
-        raise HTTPException(status_code=502, detail=str(e))
+        # Validate request
+        if not req.lead_id or req.lead_id <= 0:
+            raise HTTPException(status_code=400, detail="Valid lead_id is required")
+        
+        # Get lead with error handling
+        lead = session.get(Lead, req.lead_id)
+        if not lead:
+            raise HTTPException(status_code=404, detail=f"Lead with ID {req.lead_id} not found")
 
-    text = resp["text"].strip()
-    # Validate: expect JSON; robust parsing
-    parsed = None
-    for attempt in (text,):
+        # Validate scoring weights if provided
+        if req.scoring_weights:
+            for key, value in req.scoring_weights.items():
+                if not isinstance(value, (int, float)) or value < 1 or value > 10:
+                    raise HTTPException(
+                        status_code=400, 
+                        detail=f"Scoring weight for '{key}' must be a number between 1 and 10"
+                    )
+
+        # Prepare lead data
         try:
-            parsed = json.loads(attempt)
-            break
-        except Exception:
-            # try to extract JSON substring
-            import re
-            m = re.search(r"(\{.*\})", text, re.S)
-            if m:
-                try:
-                    parsed = json.loads(m.group(1))
-                    break
-                except Exception:
-                    parsed = None
-    if parsed is None:
-        raise HTTPException(status_code=502, detail=f"Could not parse Grok output: {text[:200]}")
+            lead_data = {
+                "company": lead.company,
+                "name": lead.name,
+                "title": lead.title,
+                "email": lead.email,
+                "website": lead.website,
+                "company_metadata": lead.company_metadata
+            }
+        except Exception as e:
+            logger.error(f"Error preparing lead data: {e}")
+            raise HTTPException(status_code=500, detail="Error preparing lead data")
 
-    score = float(parsed.get("score", 0))
-    lead.score = float(score)
-    
-    # Log the qualification activity with clean details
-    justification = parsed.get("justification", "No justification provided")
-    clean_detail = f"AI qualification completed with score {score}/100. Analysis: {justification[:100]}{'...' if len(justification) > 100 else ''}"
-    PipelineService.log_activity(
-        session, lead.id, "system", "qualification_completed",
-        clean_detail,
-        {"score": score, "justification": justification, "breakdown": parsed.get("breakdown", {})}
-    )
-    
-    # Auto-progress based on score using pipeline service
-    updated_lead = PipelineService.auto_progress_after_qualification(session, lead.id, score)
-    
-    return {"lead_id": updated_lead.id, "score": updated_lead.score, "stage": updated_lead.stage, "grok_output": parsed}
+        # Generate prompt and call Grok
+        try:
+            prompt = qualification_prompt(lead_data, req.scoring_weights)
+            logger.info(f"Calling Grok for lead {lead.id} qualification")
+            resp = call_grok(prompt)
+        except GrokError as e:
+            logger.error(f"Grok API error for lead {lead.id}: {e}")
+            raise HTTPException(status_code=502, detail=f"AI qualification service error: {str(e)}")
+        except Exception as e:
+            logger.error(f"Unexpected error calling Grok for lead {lead.id}: {e}")
+            raise HTTPException(status_code=500, detail="Internal error calling AI service")
+
+        # Parse Grok response with robust error handling
+        text = resp["text"].strip()
+        parsed = None
+        
+        # Try direct JSON parsing first
+        try:
+            parsed = json.loads(text)
+        except json.JSONDecodeError:
+            # Try to extract JSON from text
+            import re
+            json_match = re.search(r"(\{.*\})", text, re.S)
+            if json_match:
+                try:
+                    parsed = json.loads(json_match.group(1))
+                except json.JSONDecodeError:
+                    pass
+        
+        if parsed is None:
+            logger.error(f"Could not parse Grok response for lead {lead.id}: {text[:200]}")
+            raise HTTPException(
+                status_code=502, 
+                detail=f"AI returned invalid response format. Response preview: {text[:200]}"
+            )
+
+        # Validate parsed response
+        if "score" not in parsed:
+            logger.error(f"Grok response missing score for lead {lead.id}: {parsed}")
+            raise HTTPException(status_code=502, detail="AI response missing required score field")
+        
+        try:
+            score = float(parsed.get("score", 0))
+            if not (0 <= score <= 100):
+                logger.warning(f"Grok returned unusual score {score} for lead {lead.id}")
+        except (ValueError, TypeError) as e:
+            logger.error(f"Invalid score format for lead {lead.id}: {parsed.get('score')}")
+            raise HTTPException(status_code=502, detail="AI returned invalid score format")
+
+        # Update lead score
+        try:
+            lead.score = score
+            session.add(lead)
+            session.commit()
+        except Exception as e:
+            logger.error(f"Error updating lead score for lead {lead.id}: {e}")
+            session.rollback()
+            raise HTTPException(status_code=500, detail="Error updating lead score")
+        
+        # Log the qualification activity
+        try:
+            justification = parsed.get("justification", "No justification provided")
+            clean_detail = f"AI qualification completed with score {score}/100. Analysis: {justification[:100]}{'...' if len(justification) > 100 else ''}"
+            PipelineService.log_activity(
+                session, lead.id, "system", "qualification_completed",
+                clean_detail,
+                {"score": score, "justification": justification, "breakdown": parsed.get("breakdown", {})}
+            )
+        except Exception as e:
+            logger.error(f"Failed to log qualification activity for lead {lead.id}: {e}")
+            # Don't fail the request if logging fails
+        
+        # Auto-progress based on score
+        try:
+            updated_lead = PipelineService.auto_progress_after_qualification(session, lead.id, score)
+        except Exception as e:
+            logger.error(f"Error auto-progressing lead {lead.id}: {e}")
+            # Return the lead even if auto-progression fails
+            updated_lead = lead
+        
+        logger.info(f"Successfully qualified lead {lead.id} with score {score}")
+        return {
+            "lead_id": updated_lead.id, 
+            "score": updated_lead.score, 
+            "stage": updated_lead.stage, 
+            "grok_output": parsed
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error in qualification for lead {req.lead_id}: {e}")
+        session.rollback()
+        raise HTTPException(status_code=500, detail="Internal server error during qualification")
 
 @router.post("/outreach/{lead_id}", summary="Generate outreach message")
 def generate_outreach(lead_id: int, tone: str = "friendly", goal: str = "book a meeting", session=Depends(get_session)):

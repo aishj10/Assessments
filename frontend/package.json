@@ -1,6 +1,7 @@
 {
   "name": "sdr-grok-frontend",
   "version": "0.0.1",
+  "type": "module",
   "private": true,
   "dependencies": {
     "react": "^18.2.0",
