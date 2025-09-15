@@ -2,12 +2,12 @@ import React, { useState } from "react";
 
 export default function ScoringWeights({ weights, onWeightsChange, onClose }) {
   const [localWeights, setLocalWeights] = useState(weights || {
-    company_size: 1,
-    industry_fit: 2,
-    funding: 1,
-    decision_maker: 2,
-    tech_stack: 1,
-    revenue: 1
+    company_size: 3,
+    industry_fit: 5,
+    funding: 2,
+    decision_maker: 4,
+    tech_stack: 2,
+    revenue: 3
   });
 
   const criteria = [
@@ -15,42 +15,42 @@ export default function ScoringWeights({ weights, onWeightsChange, onClose }) {
       key: "company_size",
       label: "Company Size",
       description: "Employee count and company scale",
-      maxWeight: 3
+      maxWeight: 10
     },
     {
       key: "industry_fit",
       label: "Industry Fit",
       description: "Alignment with target industries",
-      maxWeight: 5
+      maxWeight: 10
     },
     {
       key: "funding",
       label: "Recent Funding",
       description: "Recent funding rounds and financial backing",
-      maxWeight: 3
+      maxWeight: 10
     },
     {
       key: "decision_maker",
       label: "Decision Maker",
       description: "Title and decision-making authority",
-      maxWeight: 5
+      maxWeight: 10
     },
     {
       key: "tech_stack",
       label: "Tech Stack",
       description: "Technology alignment and innovation readiness",
-      maxWeight: 3
+      maxWeight: 10
     },
     {
       key: "revenue",
       label: "Revenue",
       description: "Annual revenue and budget availability",
-      maxWeight: 3
+      maxWeight: 10
     }
   ];
 
   const handleWeightChange = (key, value) => {
-    const newWeights = { ...localWeights, [key]: parseInt(value) || 0 };
+    const newWeights = { ...localWeights, [key]: parseInt(value) || 1 };
     setLocalWeights(newWeights);
   };
 
@@ -61,12 +61,12 @@ export default function ScoringWeights({ weights, onWeightsChange, onClose }) {
 
   const handleReset = () => {
     const defaultWeights = {
-      company_size: 1,
-      industry_fit: 2,
-      funding: 1,
-      decision_maker: 2,
-      tech_stack: 1,
-      revenue: 1
+      company_size: 3,
+      industry_fit: 5,
+      funding: 2,
+      decision_maker: 4,
+      tech_stack: 2,
+      revenue: 3
     };
     setLocalWeights(defaultWeights);
   };
@@ -76,9 +76,9 @@ export default function ScoringWeights({ weights, onWeightsChange, onClose }) {
   };
 
   const getWeightColor = (weight) => {
-    if (weight === 0) return "text-gray-400";
-    if (weight <= 2) return "text-green-600";
-    if (weight <= 3) return "text-yellow-600";
+    if (weight <= 3) return "text-green-600";
+    if (weight <= 6) return "text-yellow-600";
+    if (weight <= 8) return "text-orange-600";
     return "text-red-600";
   };
 
@@ -103,7 +103,7 @@ export default function ScoringWeights({ weights, onWeightsChange, onClose }) {
           <span className={`font-medium ${getWeightColor(getTotalWeight())}`}>
             {getTotalWeight()}
           </span>
-          <span className="text-gray-400">(Recommended: 8-15)</span>
+          <span className="text-gray-400">(Recommended: 12-30)</span>
         </div>
       </div>
 
@@ -117,7 +117,7 @@ export default function ScoringWeights({ weights, onWeightsChange, onClose }) {
             <div className="flex items-center gap-3">
               <input
                 type="range"
-                min="0"
+                min="1"
                 max={criterion.maxWeight}
                 value={localWeights[criterion.key]}
                 onChange={(e) => handleWeightChange(criterion.key, e.target.value)}

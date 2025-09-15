@@ -4,12 +4,12 @@ from typing import Dict
 
 def qualification_prompt(lead: Dict, scoring_weights: Dict = None) -> str:
     weights = scoring_weights or {
-        "company_size": 1,
-        "industry_fit": 2,
-        "funding": 1,
-        "decision_maker": 2,
-        "tech_stack": 1,
-        "revenue": 1
+        "company_size": 3,
+        "industry_fit": 5,
+        "funding": 2,
+        "decision_maker": 4,
+        "tech_stack": 2,
+        "revenue": 3
     }
     
     # Create detailed scoring criteria based on weights
@@ -46,6 +46,8 @@ def qualification_prompt(lead: Dict, scoring_weights: Dict = None) -> str:
     3. Sum weighted scores and normalize to 0-100 scale
     4. Provide a clear justification for the overall score
     5. Include detailed breakdown showing individual criterion scores
+
+    IMPORTANT: Return ONLY valid JSON. Do not include any explanatory text before or after the JSON. Start your response with {{ and end with }}.
 
     Return strictly valid JSON:
     {{

@@ -87,7 +87,7 @@ def qualify(req: QualificationRequest, session=Depends(get_session)):
         "title": lead.title,
         "email": lead.email,
         "website": lead.website,
-        "metadata": lead.company_metadata
+        "company_metadata": lead.company_metadata
     }
 
     prompt = qualification_prompt(lead_data, req.scoring_weights)
@@ -137,7 +137,7 @@ def generate_outreach(lead_id: int, tone: str = "friendly", goal: str = "book a 
     if not lead:
         raise HTTPException(status_code=404, detail="lead not found")
     lead_data = {
-        "company": lead.company, "name": lead.name, "title": lead.title, "email": lead.email, "website": lead.website, "metadata": lead.company_metadata
+        "company": lead.company, "name": lead.name, "title": lead.title, "email": lead.email, "website": lead.website, "company_metadata": lead.company_metadata
     }
     prompt = outreach_prompt(lead_data, tone=tone, goal=goal)
     try:

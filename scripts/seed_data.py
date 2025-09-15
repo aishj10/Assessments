@@ -10,8 +10,29 @@ import time
 
 BASE_URL = "http://localhost:8000"
 
-def create_lead(lead_data):
-    """Create a lead via the API"""
+def get_existing_leads():
+    """Get all existing leads to check for duplicates"""
+    response = requests.get(f"{BASE_URL}/leads")
+    if response.status_code == 200:
+        return response.json()
+    else:
+        print(f"Error fetching existing leads: {response.text}")
+        return []
+
+def lead_exists(lead_data, existing_leads):
+    """Check if a lead already exists based on company and email"""
+    for existing_lead in existing_leads:
+        if (existing_lead['company'] == lead_data['company'] and 
+            existing_lead.get('email') == lead_data.get('email')):
+            return True
+    return False
+
+def create_lead(lead_data, existing_leads):
+    """Create a lead via the API if it doesn't already exist"""
+    if lead_exists(lead_data, existing_leads):
+        print(f"⚠️  Lead already exists: {lead_data['company']} ({lead_data.get('email', 'no email')})")
+        return None
+    
     response = requests.post(f"{BASE_URL}/leads", json=lead_data)
     if response.status_code == 200:
         return response.json()
@@ -92,9 +113,13 @@ def main():
     
     print("🌱 Seeding database with sample leads...")
     
+    # Get existing leads to avoid duplicates
+    existing_leads = get_existing_leads()
+    print(f"📋 Found {len(existing_leads)} existing leads")
+    
     created_leads = []
     for lead_data in sample_leads:
-        lead = create_lead(lead_data)
+        lead = create_lead(lead_data, existing_leads)
         if lead:
             created_leads.append(lead)
             print(f"✅ Created lead: {lead_data['company']} ({lead['id']})")

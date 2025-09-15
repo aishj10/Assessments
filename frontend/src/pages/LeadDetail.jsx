@@ -12,12 +12,12 @@ export default function LeadDetail({leadId, onBack}) {
   const [editing, setEditing] = useState(false);
   const [showScoringWeights, setShowScoringWeights] = useState(false);
   const [scoringWeights, setScoringWeights] = useState({
-    company_size: 1,
-    industry_fit: 2,
-    funding: 1,
-    decision_maker: 2,
-    tech_stack: 1,
-    revenue: 1
+    company_size: 3,
+    industry_fit: 5,
+    funding: 2,
+    decision_maker: 4,
+    tech_stack: 2,
+    revenue: 3
   });
   
   useEffect(()=>{
