@@ -39,3 +39,7 @@ class LeadRead(BaseModel):
 class QualificationRequest(BaseModel):
     lead_id: int
     scoring_weights: Optional[dict] = {}  # user-driven weights, e.g., {"company_size":2,"industry_fit":3}
+
+class StageProgressionRequest(BaseModel):
+    new_stage: PipelineStage
+    reason: Optional[str] = None

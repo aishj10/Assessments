@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from "react";
 import OutboundComposer from "../components/OutboundComposer";
 import LeadForm from "../components/LeadForm";
-import ScoringWeights from "../components/ScoringWeights";
+import LeadActivityHistory from "../components/LeadActivityHistory";
+import StageProgression from "../components/StageProgression";
+import { useScoringWeights } from "../contexts/ScoringWeightsContext";
 
 export default function LeadDetail({leadId, onBack}) {
   const [lead, setLead] = useState(null);
@@ -10,15 +12,7 @@ export default function LeadDetail({leadId, onBack}) {
   const [qualifying, setQualifying] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [editing, setEditing] = useState(false);
-  const [showScoringWeights, setShowScoringWeights] = useState(false);
-  const [scoringWeights, setScoringWeights] = useState({
-    company_size: 3,
-    industry_fit: 5,
-    funding: 2,
-    decision_maker: 4,
-    tech_stack: 2,
-    revenue: 3
-  });
+  const { scoringWeights } = useScoringWeights();
   
   useEffect(()=>{
     fetch(`/api/leads/${leadId}`)
@@ -267,19 +261,17 @@ export default function LeadDetail({leadId, onBack}) {
                     {qualifying ? "Qualifying..." : "Run AI Qualification"}
                   </button>
                   <button 
-                    onClick={() => setShowScoringWeights(true)}
-                    className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors font-medium"
-                    title="Customize scoring criteria weights"
-                  >
-                    ⚙️ Scoring Weights
-                  </button>
-                  <button 
                     onClick={genOutreach} 
                     disabled={generating}
                     className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-green-400 transition-colors font-medium"
                   >
                     {generating ? "Generating..." : "Generate Outreach"}
                   </button>
+                  <StageProgression 
+                    leadId={leadId} 
+                    currentStage={lead.stage}
+                    onStageUpdated={(newStage) => setLead(prev => ({...prev, stage: newStage}))}
+                  />
                 </div>
       </div>
 
@@ -315,6 +307,11 @@ export default function LeadDetail({leadId, onBack}) {
 
       <OutboundComposer lead={lead} />
 
+      {/* Activity History */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+        <LeadActivityHistory leadId={leadId} />
+      </div>
+
       {/* Edit Lead Form Modal */}
       {editing && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -329,18 +326,6 @@ export default function LeadDetail({leadId, onBack}) {
         </div>
       )}
 
-      {/* Scoring Weights Modal */}
-      {showScoringWeights && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <ScoringWeights
-              weights={scoringWeights}
-              onWeightsChange={setScoringWeights}
-              onClose={() => setShowScoringWeights(false)}
-            />
-          </div>
-        </div>
-      )}
     </div>
   );
 }

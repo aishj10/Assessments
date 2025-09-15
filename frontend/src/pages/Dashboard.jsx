@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from "react";
 import LeadForm from "../components/LeadForm";
 import ScoringWeights from "../components/ScoringWeights";
+import PipelineDashboard from "../components/PipelineDashboard";
+import SearchSystem from "../components/SearchSystem";
+import { useScoringWeights } from "../contexts/ScoringWeightsContext";
 
 export default function Dashboard({onOpen}) {
   const [leads, setLeads] = useState([]);
@@ -8,14 +11,9 @@ export default function Dashboard({onOpen}) {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingLead, setEditingLead] = useState(null);
   const [showScoringWeights, setShowScoringWeights] = useState(false);
-  const [scoringWeights, setScoringWeights] = useState({
-    company_size: 3,
-    industry_fit: 5,
-    funding: 2,
-    decision_maker: 4,
-    tech_stack: 2,
-    revenue: 3
-  });
+  const [showSearchSystem, setShowSearchSystem] = useState(false);
+  const [activeTab, setActiveTab] = useState('leads');
+  const { scoringWeights, updateScoringWeights } = useScoringWeights();
   
   useEffect(()=> {
     fetch("/api/leads")
@@ -156,11 +154,18 @@ export default function Dashboard({onOpen}) {
             {leads.length} total leads
           </div>
           <button
+            onClick={() => setShowSearchSystem(true)}
+            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors font-medium"
+            title="Search through leads, activities, and company metadata"
+          >
+            🔍 Search
+          </button>
+          <button
             onClick={() => setShowScoringWeights(true)}
             className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors font-medium"
-            title="Customize scoring criteria weights"
+            title="Customize global scoring criteria weights (applies to all leads)"
           >
-            ⚙️ Scoring Weights
+            ⚙️ Global Scoring Weights
           </button>
           <button
             onClick={() => setShowCreateForm(true)}
@@ -170,14 +175,43 @@ export default function Dashboard({onOpen}) {
           </button>
         </div>
       </div>
-      
-      {leads.length === 0 ? (
-        <div className="text-center py-12">
-          <div className="text-gray-500 text-lg">No leads found</div>
-          <div className="text-gray-400 text-sm mt-2">Add some leads to get started</div>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+      {/* Tab Navigation */}
+      <div className="border-b border-gray-200 mb-6">
+        <nav className="-mb-px flex space-x-8">
+          <button
+            onClick={() => setActiveTab('leads')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'leads'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            Leads ({leads.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('pipeline')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'pipeline'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            Pipeline Monitoring
+          </button>
+        </nav>
+      </div>
+
+      {/* Tab Content */}
+      {activeTab === 'leads' && (
+        <>
+          {leads.length === 0 ? (
+            <div className="text-center py-12">
+              <div className="text-gray-500 text-lg">No leads found</div>
+              <div className="text-gray-400 text-sm mt-2">Add some leads to get started</div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {leads.map(l => (
             <div key={l.id} className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
               <div className="flex justify-between items-start mb-3">
@@ -261,6 +295,12 @@ export default function Dashboard({onOpen}) {
           ))}
         </div>
       )}
+        </>
+      )}
+
+      {activeTab === 'pipeline' && (
+        <PipelineDashboard />
+      )}
 
       {/* Create Lead Form Modal */}
       {showCreateForm && (
@@ -289,17 +329,28 @@ export default function Dashboard({onOpen}) {
         </div>
       )}
 
-      {/* Scoring Weights Modal */}
-      {showScoringWeights && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <ScoringWeights
-              weights={scoringWeights}
-              onWeightsChange={setScoringWeights}
-              onClose={() => setShowScoringWeights(false)}
-            />
+              {/* Scoring Weights Modal */}
+              {showScoringWeights && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+                  <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                    <ScoringWeights
+                      weights={scoringWeights}
+                      onWeightsChange={updateScoringWeights}
+                      onClose={() => setShowScoringWeights(false)}
+                    />
           </div>
         </div>
+      )}
+
+      {/* Search System Modal */}
+      {showSearchSystem && (
+        <SearchSystem
+          onLeadSelect={(leadId) => {
+            setShowSearchSystem(false);
+            onOpen(leadId);
+          }}
+          onClose={() => setShowSearchSystem(false)}
+        />
       )}
     </div>
   );

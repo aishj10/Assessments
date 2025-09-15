@@ -1,14 +1,13 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useScoringWeights } from "../contexts/ScoringWeightsContext";
 
 export default function ScoringWeights({ weights, onWeightsChange, onClose }) {
-  const [localWeights, setLocalWeights] = useState(weights || {
-    company_size: 3,
-    industry_fit: 5,
-    funding: 2,
-    decision_maker: 4,
-    tech_stack: 2,
-    revenue: 3
-  });
+  const { defaultWeights, resetScoringWeights } = useScoringWeights();
+  const [localWeights, setLocalWeights] = useState(weights || defaultWeights);
+
+  useEffect(() => {
+    setLocalWeights(weights || defaultWeights);
+  }, [weights, defaultWeights]);
 
   const criteria = [
     {
@@ -60,15 +59,8 @@ export default function ScoringWeights({ weights, onWeightsChange, onClose }) {
   };
 
   const handleReset = () => {
-    const defaultWeights = {
-      company_size: 3,
-      industry_fit: 5,
-      funding: 2,
-      decision_maker: 4,
-      tech_stack: 2,
-      revenue: 3
-    };
     setLocalWeights(defaultWeights);
+    resetScoringWeights();
   };
 
   const getTotalWeight = () => {
@@ -85,7 +77,7 @@ export default function ScoringWeights({ weights, onWeightsChange, onClose }) {
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
       <div className="flex justify-between items-center mb-6">
-        <h3 className="text-lg font-semibold text-gray-900">Customize Scoring Weights</h3>
+        <h3 className="text-lg font-semibold text-gray-900">Global Scoring Weights</h3>
         <button
           onClick={onClose}
           className="text-gray-400 hover:text-gray-600 text-xl"
@@ -96,7 +88,7 @@ export default function ScoringWeights({ weights, onWeightsChange, onClose }) {
 
       <div className="mb-4">
         <p className="text-sm text-gray-600 mb-2">
-          Adjust the importance of different lead criteria. Higher weights mean that criterion will have more influence on the overall score.
+          Adjust the importance of different lead criteria for <strong>all leads</strong>. Higher weights mean that criterion will have more influence on the overall score across your entire pipeline.
         </p>
         <div className="flex items-center gap-4 text-sm">
           <span className="text-gray-500">Total Weight:</span>
